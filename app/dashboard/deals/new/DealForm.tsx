@@ -159,7 +159,7 @@ export default function DealForm({ retailerId, categories, initialData }: DealFo
           onChange={handleChange}
           required
           rows={4}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Describe the deal, what's included, and why it's a great offer..."
         />
       </div>
@@ -207,7 +207,7 @@ export default function DealForm({ retailerId, categories, initialData }: DealFo
           value={formData.category_id}
           onChange={handleChange}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Select a category</option>
           {categories.map((category) => (

@@ -55,10 +55,22 @@ export default function RegisterForm() {
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`,
+        },
       });
 
       if (signUpError) {
-        setError(signUpError.message);
+        // Handle rate limit errors specifically
+        if (signUpError.message.toLowerCase().includes('rate limit') || 
+            signUpError.message.toLowerCase().includes('email rate limit exceeded')) {
+          setError('Too many signup attempts. Please wait a few minutes before trying again, or contact support if you need immediate assistance.');
+        } else if (signUpError.message.toLowerCase().includes('already registered') || 
+                   signUpError.message.toLowerCase().includes('user already registered')) {
+          setError('This email is already registered. Please sign in instead or use a different email address.');
+        } else {
+          setError(signUpError.message);
+        }
         setIsLoading(false);
         return;
       }
@@ -69,28 +81,24 @@ export default function RegisterForm() {
         return;
       }
 
-      // 2. Create retailer record (pending approval)
+      // 2. Create retailer account using database function (bypasses RLS)
       const slug = formData.businessName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
 
-      const { error: retailerError } = await supabase
-        .from('retailers')
-        .insert({
-          name: formData.businessName,
-          slug: slug,
-          website_url: formData.websiteUrl,
-          commission: formData.commission,
-          user_id: authData.user.id,
-          status: 'pending',
-          is_active: false,
-          deal_count: 0,
-          logo_url: '', // Will be added later
+      const { data: retailerData, error: retailerError } = await supabase
+        .rpc('create_retailer_account', {
+          p_user_id: authData.user.id,
+          p_email: formData.email,
+          p_business_name: formData.businessName,
+          p_slug: slug,
+          p_website_url: formData.websiteUrl,
+          p_commission: parseFloat(formData.commission) || 0,
         });
 
       if (retailerError) {
-        setError('Failed to create retailer profile: ' + retailerError.message);
+        setError('Failed to create retailer account: ' + retailerError.message);
         setIsLoading(false);
         return;
       }
@@ -139,13 +147,16 @@ export default function RegisterForm() {
         />
 
         <Input
-          label="Commission Structure"
-          type="text"
+          label="Commission Rate (%)"
+          type="number"
           name="commission"
           value={formData.commission}
           onChange={handleChange}
           required
-          placeholder="e.g., 5% on all sales"
+          step="0.01"
+          min="0"
+          max="100"
+          placeholder="10"
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -58,7 +58,7 @@ export default function ProfileForm({ retailer }: ProfileFormProps) {
           name: formData.name,
           logo_url: formData.logo_url,
           website_url: formData.website_url,
-          commission: formData.commission,
+          commission: parseFloat(formData.commission) || 0,
           affiliate_id: formData.affiliate_id,
           updated_at: new Date().toISOString(),
         })
@@ -149,13 +149,16 @@ export default function ProfileForm({ retailer }: ProfileFormProps) {
       )}
 
       <Input
-        label="Commission Structure"
-        type="text"
+        label="Commission Rate (%)"
+        type="number"
         name="commission"
         value={formData.commission}
         onChange={handleChange}
         required
-        placeholder="e.g., 5% on all sales"
+        step="0.01"
+        min="0"
+        max="100"
+        placeholder="10"
       />
 
       <Input
