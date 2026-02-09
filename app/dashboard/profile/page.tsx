@@ -4,8 +4,10 @@
  */
 
 import { requireRetailer } from '@/lib/auth';
-export const dynamic = 'force-dynamic';import { supabase } from '@/lib/supabase/config';
+import { createClient } from '@/lib/supabase/server';
 import ProfileForm from './ProfileForm';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Profile | Retailer Portal',
@@ -14,6 +16,7 @@ export const metadata = {
 
 export default async function ProfilePage() {
   const { retailerId } = await requireRetailer();
+  const supabase = await createClient();
   
   const { data: retailer } = await supabase
     .from('retailers')

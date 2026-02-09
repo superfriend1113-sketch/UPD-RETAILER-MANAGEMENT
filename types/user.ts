@@ -14,11 +14,11 @@ export interface UserProfile {
   role: UserRole;                // User's role in the system
 
   // Retailer Linking (for retailer role)
-  retailerId?: string | null;    // UUID of linked retailer account
+  retailer_id?: string | null;   // UUID of linked retailer account (snake_case to match DB)
 
   // Timestamps
-  createdAt: Date | string;
-  updatedAt: Date | string;
+  created_at: Date | string;
+  updated_at: Date | string;
 }
 
 /**
@@ -104,8 +104,8 @@ export function validateUserProfile(profile: Partial<UserProfile>): string[] {
   }
 
   // Retailer linking validation
-  if (profile.role === 'retailer' && !profile.retailerId) {
-    errors.push('retailerId is required for retailer role');
+  if (profile.role === 'retailer' && !profile.retailer_id) {
+    errors.push('retailer_id is required for retailer role');
   }
 
   return errors;

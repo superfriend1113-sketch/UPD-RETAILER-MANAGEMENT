@@ -4,8 +4,41 @@
  */
 
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 
-export default function Home() {
+export const dynamic = 'force-dynamic';
+
+export default async function Home() {
+  // Check if user is already logged in
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user) {
+    // User is logged in, check their status
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role, retailer_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role === 'retailer' && profile.retailer_id) {
+      // Get retailer status
+      const { data: retailer } = await supabase
+        .from('retailers')
+        .select('status')
+        .eq('id', profile.retailer_id)
+        .single();
+
+      // Redirect based on retailer status
+      if (retailer?.status === 'approved') {
+        redirect('/dashboard');
+      } else {
+        redirect('/pending');
+      }
+    }
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8">

@@ -6,7 +6,7 @@
 import { requireRetailer } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
-import { supabase } from '@/lib/supabase/config';
+import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import type { Deal } from '@/types/deal';
 
@@ -16,13 +16,10 @@ export const metadata = {
 };
 
 async function getRetailerDeals(retailerId: string) {
+  const supabase = await createClient();
   const { data: deals, error } = await supabase
     .from('deals')
-    .select(`
-      *,
-      category:categories(id, name, slug),
-      retailer:retailers(id, name, slug)
-    `)
+    .select('*')
     .eq('retailer_id', retailerId)
     .order('created_at', { ascending: false });
 

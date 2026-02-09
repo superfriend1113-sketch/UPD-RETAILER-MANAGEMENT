@@ -4,7 +4,7 @@
  */
 
 import { requireRetailer } from '@/lib/auth';
-import { supabase } from '@/lib/supabase/config';
+import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +14,7 @@ export const metadata = {
 };
 
 async function getDashboardMetrics(retailerId: string) {
+  const supabase = await createClient();
   // Fetch retailer's deals
   const { data: deals, error } = await supabase
     .from('deals')
@@ -51,6 +52,7 @@ async function getDashboardMetrics(retailerId: string) {
 
 export default async function DashboardPage() {
   const { email, retailerId, profile } = await requireRetailer();
+  const supabase = await createClient();
   
   // Fetch retailer info
   const { data: retailer } = await supabase

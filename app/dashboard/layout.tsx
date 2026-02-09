@@ -4,7 +4,8 @@
  */
 
 import { redirect } from 'next/navigation';
-import { requireRetailer } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import Sidebar from '@/components/layout/Sidebar';
 
 export default async function DashboardLayout({
@@ -12,11 +13,41 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Server-side authentication check with retailer role requirement
+  // Server-side authentication check
   try {
-    await requireRetailer();
+    const { uid } = await requireAuth();
+    const supabase = await createClient();
+
+    // Get user profile and retailer status
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role, retailer_id')
+      .eq('id', uid)
+      .single();
+
+    // Check if user is a retailer
+    if (!profile || profile.role !== 'retailer') {
+      redirect('/login');
+    }
+
+    // Check retailer status
+    if (profile.retailer_id) {
+      const { data: retailer } = await supabase
+        .from('retailers')
+        .select('status')
+        .eq('id', profile.retailer_id)
+        .single();
+
+      // Redirect to pending page if not approved
+      if (retailer?.status !== 'approved') {
+        redirect('/pending');
+      }
+    } else {
+      // No retailer account linked, redirect to pending
+      redirect('/pending');
+    }
   } catch (error) {
-    // Redirect to login if not authenticated or not a retailer
+    // Redirect to login if not authenticated
     redirect('/login');
   }
 

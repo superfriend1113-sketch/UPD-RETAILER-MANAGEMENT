@@ -4,7 +4,7 @@
  */
 
 import { requireRetailer } from '@/lib/auth';
-import { supabase } from '@/lib/supabase/config';
+import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import DealForm from './DealForm';
 
@@ -16,6 +16,7 @@ export const metadata = {
 };
 
 async function getCategories() {
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('categories')
     .select('*')
@@ -32,6 +33,7 @@ async function getCategories() {
 
 export default async function NewDealPage() {
   const { retailerId, profile } = await requireRetailer();
+  const supabase = await createClient();
   
   // Get retailer info to check status
   const { data: retailer } = await supabase

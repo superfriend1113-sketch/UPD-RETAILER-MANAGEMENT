@@ -4,7 +4,7 @@
  */
 
 import { cookies } from 'next/headers';
-import { supabase } from './supabase/config';
+import { createClient } from './supabase/server';
 import type { UserProfile } from '@/types/user';
 
 /**
@@ -15,33 +15,18 @@ import type { UserProfile } from '@/types/user';
  */
 export async function createSession(accessToken: string, refreshToken: string): Promise<boolean> {
   try {
-    // Verify the token is valid by getting user
-    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    const supabase = await createClient();
     
-    if (error || !user) {
-      console.error('Invalid token:', error);
+    // Set the session using Supabase SSR client
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    
+    if (error) {
+      console.error('Error setting session:', error);
       return false;
     }
-    
-    // Set auth cookies
-    const cookieStore = await cookies();
-    const maxAge = 60 * 60 * 24 * 7; // 7 days
-    
-    cookieStore.set('sb-access-token', accessToken, {
-      maxAge,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
-    
-    cookieStore.set('sb-refresh-token', refreshToken, {
-      maxAge,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
     
     return true;
   } catch (error) {
@@ -59,19 +44,22 @@ export async function verifySession(): Promise<{
   email: string | undefined;
 } | null> {
   try {
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get('sb-access-token');
+    const supabase = await createClient();
     
-    if (!accessToken?.value) {
+    // Get the current user (more secure than getSession)
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (error) {
+      console.log('Auth error in verifySession:', error);
       return null;
     }
     
-    // Verify the token and get user
-    const { data: { user }, error } = await supabase.auth.getUser(accessToken.value);
-    
-    if (error || !user) {
+    if (!user) {
+      console.log('No user found in verifySession');
       return null;
     }
+    
+    console.log('User verified:', user.id, user.email);
     
     return {
       uid: user.id,
@@ -88,9 +76,8 @@ export async function verifySession(): Promise<{
  */
 export async function destroySession(): Promise<void> {
   try {
-    const cookieStore = await cookies();
-    cookieStore.delete('sb-access-token');
-    cookieStore.delete('sb-refresh-token');
+    const supabase = await createClient();
+    await supabase.auth.signOut();
   } catch (error) {
     console.error('Error destroying session:', error);
   }
@@ -129,6 +116,7 @@ export async function requireAuth(): Promise<{
  */
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   try {
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('user_profiles')
       .select('*')
@@ -175,14 +163,14 @@ export async function requireRetailer(): Promise<{
   }
 
   // Check if retailer has a linked retailer account
-  if (!profile.retailerId) {
+  if (!profile.retailer_id) {
     throw new Error('No retailer account linked to this user');
   }
 
   return {
     ...session,
     profile,
-    retailerId: profile.retailerId,
+    retailerId: profile.retailer_id,
   };
 }
 
@@ -208,7 +196,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 export async function getCurrentRetailerId(): Promise<string | null> {
   try {
     const profile = await getCurrentUserProfile();
-    return profile?.retailerId || null;
+    return profile?.retailer_id || null;
   } catch {
     return null;
   }

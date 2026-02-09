@@ -4,7 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createSession, destroySession } from '@/lib/auth';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { loadSupabaseEnv } from '@/lib/supabase/env';
 
 /**
  * POST /api/auth/session
@@ -21,16 +23,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const success = await createSession(accessToken, refreshToken);
+    const cookieStore = await cookies();
+    const config = loadSupabaseEnv();
 
-    if (!success) {
+    // Create Supabase client with cookie handling
+    const supabase = createServerClient(config.url, config.anonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        },
+      },
+    });
+
+    // Set the session
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (error) {
+      console.error('Session creation error:', error);
       return NextResponse.json(
         { error: 'Failed to create session' },
         { status: 401 }
       );
     }
 
-    return NextResponse.json({ success: true });
+    console.log('Session created successfully for user:', data.user?.id);
+
+    // Create response with session data
+    const response = NextResponse.json({ 
+      success: true,
+      user: {
+        id: data.user?.id,
+        email: data.user?.email,
+      }
+    });
+
+    return response;
   } catch (error) {
     console.error('Session creation error:', error);
     return NextResponse.json(
@@ -46,7 +81,23 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE() {
   try {
-    await destroySession();
+    const cookieStore = await cookies();
+    const config = loadSupabaseEnv();
+
+    const supabase = createServerClient(config.url, config.anonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        },
+      },
+    });
+
+    await supabase.auth.signOut();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Session deletion error:', error);

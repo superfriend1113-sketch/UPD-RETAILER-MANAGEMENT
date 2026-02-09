@@ -51,24 +51,35 @@ export default function RegisterForm() {
     }
 
     try {
-      // 1. Create auth user
+      // 1. Create auth user with retailer role in metadata
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/login`,
+          data: {
+            role: 'retailer',
+            business_name: formData.businessName,
+          }
         },
       });
 
       if (signUpError) {
-        // Handle rate limit errors specifically
-        if (signUpError.message.toLowerCase().includes('rate limit') || 
-            signUpError.message.toLowerCase().includes('email rate limit exceeded')) {
-          setError('Too many signup attempts. Please wait a few minutes before trying again, or contact support if you need immediate assistance.');
-        } else if (signUpError.message.toLowerCase().includes('already registered') || 
-                   signUpError.message.toLowerCase().includes('user already registered')) {
+        console.error('Signup error:', signUpError);
+        
+        // Handle specific error cases
+        const errorMessage = signUpError.message.toLowerCase();
+        
+        if (errorMessage.includes('email rate limit exceeded')) {
+          setError('Too many signup attempts. Please wait 5-10 minutes before trying again.');
+        } else if (errorMessage.includes('user already registered') || errorMessage.includes('already registered')) {
           setError('This email is already registered. Please sign in instead or use a different email address.');
+        } else if (errorMessage.includes('invalid email')) {
+          setError('Please enter a valid email address.');
+        } else if (errorMessage.includes('password')) {
+          setError('Password must be at least 6 characters long.');
         } else {
+          // Show the actual error for transparency
           setError(signUpError.message);
         }
         setIsLoading(false);
@@ -87,6 +98,15 @@ export default function RegisterForm() {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
 
+      console.log('Calling create_retailer_account with:', {
+        p_user_id: authData.user.id,
+        p_email: formData.email,
+        p_business_name: formData.businessName,
+        p_slug: slug,
+        p_website_url: formData.websiteUrl,
+        p_commission: parseFloat(formData.commission) || 0,
+      });
+
       const { data: retailerData, error: retailerError } = await supabase
         .rpc('create_retailer_account', {
           p_user_id: authData.user.id,
@@ -97,17 +117,63 @@ export default function RegisterForm() {
           p_commission: parseFloat(formData.commission) || 0,
         });
 
+      console.log('RPC Response:', { data: retailerData, error: retailerError });
+
       if (retailerError) {
-        setError('Failed to create retailer account: ' + retailerError.message);
+        console.error('Retailer creation error:', retailerError);
+        console.error('Error details:', JSON.stringify(retailerError, null, 2));
+        
+        // Handle specific database errors
+        const errorMessage = (retailerError.message || retailerError.hint || String(retailerError)).toLowerCase();
+        
+        if (errorMessage.includes('already registered') || errorMessage.includes('user already registered')) {
+          // Instead of showing error, just redirect to pending page
+          // The account exists, just need to check status
+          window.location.href = '/pending';
+          return;
+        } else if (errorMessage.includes('duplicate') || errorMessage.includes('unique constraint')) {
+          setError('An account with this information already exists. Please sign in or contact support.');
+        } else if (retailerError.message) {
+          setError('Failed to create retailer account: ' + retailerError.message);
+        } else if (retailerError.hint) {
+          setError(retailerError.hint);
+        } else {
+          setError('Failed to create retailer account. Please try again or contact support.');
+        }
         setIsLoading(false);
         return;
       }
 
-      // Show success message and redirect
-      alert('Account created! Please check your email to verify your account. Your application will be reviewed by our team.');
-      router.push('/login');
+      console.log('Retailer account created successfully! Retailer ID:', retailerData);
+
+      // 3. Create server-side session via Server Action
+      if (!authData.session) {
+        setError('Failed to create session');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Creating server-side session...');
+      const { createSessionAction } = await import('./actions');
+      const sessionResult = await createSessionAction(
+        authData.session.access_token,
+        authData.session.refresh_token
+      );
+
+      if (!sessionResult.success) {
+        console.error('Failed to create session:', sessionResult.error);
+        // Even if session creation fails, still redirect to login
+        router.push('/login');
+        return;
+      }
+
+      console.log('Session created successfully, redirecting to /pending');
+      
+      // Server Action has set cookies, now redirect
+      router.push('/pending');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Registration error:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
       setIsLoading(false);
     }
   };

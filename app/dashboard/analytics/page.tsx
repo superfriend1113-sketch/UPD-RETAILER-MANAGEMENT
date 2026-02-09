@@ -4,7 +4,7 @@
  */
 
 import { requireRetailer } from '@/lib/auth';
-import { supabase } from '@/lib/supabase/config';
+import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +14,7 @@ export const metadata = {
 };
 
 async function getDealAnalytics(retailerId: string) {
+  const supabase = await createClient();
   const { data: deals, error } = await supabase
     .from('deals')
     .select('*')
